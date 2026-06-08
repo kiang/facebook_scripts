@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 """
-Update the Facebook posts static site from a new backup zip.
+Step 1: Update the Facebook posts static site from a new backup zip.
 
-Usage:
-    python3 update_site.py [zipfile]
+Place your new Facebook backup zip in ./tmp/ then run:
 
-If no zipfile is given, uses the most recent .zip in SITE_DIR/tmp/.
+    python3 001_update_site.py [zipfile]
+
+If no zipfile is given, uses the most recent .zip in ./tmp/.
 
 Steps:
-  1. Extract the zip into SITE_DIR/tmp/
+  1. Extract the zip into ./tmp/
   2. Parse new posts from profile_posts_*.json
   3. Deduplicate against existing site data (by timestamp)
   4. Merge new posts into monthly JSON files and update index.json
-  5. Copy new images into SITE_DIR/images/YYYY-MM/
+  5. Copy new images into ../facebook/images/YYYY-MM/
+  6. Clean up the extracted directory
+
+After this, run 002_push_to_github.sh to publish.
 """
 
 import json
@@ -24,8 +28,9 @@ import glob as globmod
 from datetime import datetime
 from collections import defaultdict
 
-SITE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "facebook")
-TMP_DIR = os.path.join(SITE_DIR, "tmp")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SITE_DIR = os.path.join(SCRIPT_DIR, "..", "facebook")
+TMP_DIR = os.path.join(SCRIPT_DIR, "tmp")
 DATA_DIR = os.path.join(SITE_DIR, "data")
 IMG_DIR = os.path.join(SITE_DIR, "images")
 

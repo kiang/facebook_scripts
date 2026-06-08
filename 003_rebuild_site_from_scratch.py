@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 """
-Generate a static website from Facebook posts backup.
+(Legacy) Full site regeneration from a backup directory.
 
-Output structure: facebook-kolctw-2026-3-6/posts_site/
-  index.html              - single-page app shell
-  data/index.json         - manifest: [{year, month, count}, ...]
-  data/YYYY-MM.json       - posts for that month
-  images/FILENAME         - copied image files (flat, deduped by filename)
+Only needed if you want to rebuild the entire site from scratch.
+For normal incremental updates, use 001_update_site.py instead.
 
-Rules:
-  - Skip posts made in groups (title contains 在...中)
-  - Skip posts that have video attachments
-  - Copy image files into posts_site/images/
+Reads from an extracted backup directory and generates:
+  index.html, data/index.json, data/YYYY-MM.json, images/
+
+NOTE: Hardcoded SRC_DIR below must be updated to your backup directory path.
 """
 
 import json

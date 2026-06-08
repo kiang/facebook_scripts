@@ -2,178 +2,78 @@
 
 Scripts to incrementally update a static browsable website from Facebook data backups and push the result to GitHub Pages.
 
-## Overview
+## Quick start
 
-Facebook's data export produces a ZIP archive containing JSON files and media. These scripts let you:
+```bash
+# 1. Download new backup from Facebook, place ZIP in tmp/
+cp ~/Downloads/facebook-kolctw-*.zip tmp/
 
-1. **Update** the existing site with new posts from a fresh backup ZIP
-2. **Push** the updated site to a GitHub repository in size-safe batches
+# 2. Update the site with new posts
+python3 001_update_site.py
 
-The static site lives at `../facebook/` relative to this scripts directory. New backup ZIPs are placed in `../facebook/tmp/`.
-
----
-
-## Prerequisites
-
-- Python 3.8+
-- `git` with SSH access configured for GitHub
-- A Facebook data export ZIP file
-
-### Facebook export format
-
-When you request your data from Facebook, it downloads as a ZIP containing:
-
-```
-this_profile's_activity_across_facebook/
-  posts/
-    profile_posts_1.json
-    profile_posts_2.json
-    media/
-  messages/
-    inbox/
-    ...
-profile_information/
-index.html
+# 3. Push to GitHub
+bash 002_push_to_github.sh
 ```
 
----
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `001_update_site.py` | Extract new backup zip from `tmp/`, merge new posts into the static site at `../facebook/` |
+| `002_push_to_github.sh` | Push the updated site to GitHub in size-safe batches (one monthly image folder per commit) |
+| `003_rebuild_site_from_scratch.py` | (Legacy) Full site regeneration from an extracted backup directory |
+| `004_merge_two_backup_dirs.py` | (Legacy) Merge two extracted backup directories into one |
 
 ## Directory layout
 
 ```
 /home/kiang/public_html/
-  facebook_scripts/          ← this repo
-    update_site.py           ← main update script
-    push_to_github.sh        ← push to GitHub
-    generate_posts_site.py   ← full site regeneration (legacy)
-    merge_backup.py          ← backup merging (legacy)
-  facebook/                  ← the generated static site
+  facebook_scripts/          <- this repo
+    tmp/                     <- place new backup ZIPs here
+      *.zip
+    001_update_site.py
+    002_push_to_github.sh
+    003_rebuild_site_from_scratch.py
+    004_merge_two_backup_dirs.py
+  facebook/                  <- the generated static site
     index.html
     data/
-      index.json             ← manifest listing all months
-      2026-04.json           ← posts for April 2026
+      index.json
+      2026-04.json
       ...
     images/
-      2026-04/               ← images for that month
+      2026-04/
       ...
-    tmp/
-      *.zip                  ← new backup ZIPs go here
 ```
 
----
+## Prerequisites
 
-## Script: `update_site.py`
+- Python 3.8+
+- `git` with SSH access configured for GitHub
 
-Incrementally updates the static site from a new backup ZIP.
+## What `001_update_site.py` does
 
-### Usage
+1. Finds the most recent `.zip` in `tmp/` (or uses a path you specify)
+2. Extracts into `tmp/<zip-name>/`
+3. Loads posts from `profile_posts_*.json`
+4. Filters out group posts and video-only posts
+5. Deduplicates against existing site data by timestamp
+6. Merges new posts into `../facebook/data/YYYY-MM.json` files
+7. Updates `../facebook/data/index.json`
+8. Copies new images to `../facebook/images/YYYY-MM/`
+9. Cleans up the extracted directory
 
-Place the new backup ZIP in `../facebook/tmp/`, then:
+## What `002_push_to_github.sh` does
 
-```bash
-python3 update_site.py
-```
-
-Or specify a ZIP path directly:
-
-```bash
-python3 update_site.py /path/to/backup.zip
-```
-
-### What it does
-
-1. Extracts the ZIP into a temporary directory
-2. Loads posts from `profile_posts_*.json`
-3. Filters out group posts (title contains `在...中`) and video-only posts
-4. Deduplicates against existing site data by timestamp
-5. Merges new posts into the correct monthly `data/YYYY-MM.json` files
-6. Updates `data/index.json` with new counts
-7. Copies new images to `images/YYYY-MM/`
-8. Cleans up the extracted temporary directory
-
-### Output
-
-```
-Using zip: ../facebook/tmp/facebook-kolctw-2026-4-17-3XLQGTvQ.zip
-Loaded 224 posts from backup
-After filtering group/video: 130 posts
-Existing site has 9283 posts
-New posts to add: 112
-  2026-04: +112 -> 207 total
-Updated index.json (127 months)
-  copied 48 images, 0 missing sources
-Done! Added 112 new posts across 1 months.
-```
-
----
-
-## Script: `push_to_github.sh`
-
-Pushes the site to a GitHub repository in small batches.
-
-### Background
-
-The site contains ~2GB of images. GitHub recommends keeping pushes small. This script commits one monthly image folder at a time.
-
-### Setup
-
-Pre-configured for `git@github.com:kiang/facebook.git`. Edit `REPO_URL` to change.
-
-### Usage
-
-```bash
-bash push_to_github.sh
-```
-
-### What it does
-
-1. Clones the repository to `/tmp/facebook-gh-push` (or pulls latest if already cloned)
-2. Copies and commits `index.html` + `data/` files (skips if unchanged)
-3. For each monthly image folder, copies new files, commits, and pushes
-4. Uses `cp -n` (no clobber) and `git diff --cached` to skip already-pushed content
-
-### Resumable
-
-If interrupted, re-run it — it detects what has already been pushed.
-
----
+1. Clones/pulls `git@github.com:kiang/facebook.git` to `/tmp/facebook-gh-push`
+2. Commits `index.html` + `data/` (skips if unchanged)
+3. Commits each monthly image folder separately and pushes
+4. Resumable: re-run if interrupted
 
 ## Site features
 
-- **Month archive sidebar** — lists all months with post counts
-- **Hash-based routing** — shareable URLs: `#2025-11`, `#post/1764252237`, `#search/台南`
-- **Full-text search** — searches across all months' data
-- **Photo lightbox** — click images to view full-size, arrow keys navigate
-- **Link detection** — URLs in post text become clickable links
-- **Responsive layout** — sidebar collapses on narrow screens
-
-### Encoding note
-
-Facebook exports text with UTF-8 characters stored as Latin-1 bytes. The `fb()` helper re-encodes strings correctly:
-
-```python
-def fb(s):
-    return s.encode('latin-1').decode('utf-8')
-```
-
----
-
-## Typical workflow
-
-```bash
-# 1. Download new backup from Facebook, place ZIP in tmp/
-# (already at ../facebook/tmp/facebook-kolctw-2026-4-17-3XLQGTvQ.zip)
-
-# 2. Update the site with new posts
-python3 update_site.py
-
-# 3. Push to GitHub
-bash push_to_github.sh
-```
-
----
-
-## Legacy scripts
-
-- `merge_backup.py` — Merges two extracted backup directories. Used when maintaining a full backup folder. No longer needed with the incremental `update_site.py` approach.
-- `generate_posts_site.py` — Full site regeneration from a backup directory. Use only if you need to rebuild the entire site from scratch.
+- Month archive sidebar with post counts
+- Hash-based routing (`#2025-11`, `#post/1764252237`, `#search/台南`)
+- Full-text search across all months
+- Photo lightbox with arrow key navigation
+- Responsive layout

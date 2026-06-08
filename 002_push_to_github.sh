@@ -1,5 +1,6 @@
 #!/bin/bash
-# Push the Facebook static site to git@github.com:kiang/facebook.git
+# Step 2: Push the Facebook static site to git@github.com:kiang/facebook.git
+# Run this after 001_update_site.py has processed a new backup zip.
 # Commits in batches: data files first, then one commit per monthly image folder.
 # Resumable: uses content comparison to skip already-pushed content.
 

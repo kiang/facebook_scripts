@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
-Merge Facebook backup DIR2 (recent) into DIR1 (full).
-For JSON files that exist in both: merge arrays, deduplicate by content hash.
-For files only in DIR2: already copied by cp -rn, skip.
+(Legacy) Merge two extracted Facebook backup directories.
+
+Only needed if you maintain full backup folders and want to merge them.
+For normal incremental updates, use 001_update_site.py instead.
+
+NOTE: Hardcoded DIR1/DIR2 below must be updated to your directory paths.
 """
 
 import json
