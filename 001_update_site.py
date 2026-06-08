@@ -174,7 +174,10 @@ def main():
     print(f"New posts to add: {len(new_posts)}")
 
     if not new_posts:
-        print("Nothing new to merge. Done.")
+        print("Nothing new to merge.")
+        print(f"Cleaning up {extract_dir} ...")
+        shutil.rmtree(extract_dir)
+        print("Done.")
         return
 
     # Group new posts by month
