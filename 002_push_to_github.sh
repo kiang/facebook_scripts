@@ -6,32 +6,20 @@
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SITE_DIR="$(cd "$SCRIPT_DIR/../facebook" && pwd)"
-REPO_URL="git@github.com:kiang/facebook.git"
-WORK_DIR="/tmp/facebook-gh-push"
 BATCH_MAX_BYTES=$((500 * 1024 * 1024))  # 500 MB per push
 
-if [ ! -d "$SITE_DIR/data" ]; then
-  echo "Error: $SITE_DIR/data not found. Run 001_update_site.py first."
+if [ ! -d "$SITE_DIR/.git" ]; then
+  echo "Error: $SITE_DIR is not a git repository."
   exit 1
 fi
 
-# ── clone or pull ─────────────────────────────────────────────────────────────
+cd "$SITE_DIR"
 
-if [ -d "$WORK_DIR/.git" ]; then
-  echo "Using existing repo at $WORK_DIR, pulling latest..."
-  cd "$WORK_DIR"
-  git pull origin main --rebase || true
-else
-  echo "Cloning $REPO_URL into $WORK_DIR ..."
-  git clone "$REPO_URL" "$WORK_DIR"
-  cd "$WORK_DIR"
-fi
+git pull origin main --rebase || true
 
 # ── index.html + data/ ───────────────────────────────────────────────────────
 
-echo "Syncing index.html + data/ ..."
-cp "$SITE_DIR/index.html" .
-cp -r "$SITE_DIR/data" .
+echo "Checking index.html + data/ ..."
 git add index.html data/
 
 if git diff --cached --quiet; then
@@ -43,8 +31,6 @@ else
 fi
 
 # ── images in controlled batches ──────────────────────────────────────────────
-
-mkdir -p images
 
 batch_bytes=0
 batch_files=0
@@ -71,38 +57,30 @@ flush_batch() {
   batch_months=""
 }
 
-for month_dir in "$SITE_DIR/images"/*/; do
+for month_dir in images/*/; do
   [ -d "$month_dir" ] || continue
   month=$(basename "$month_dir")
-  dest="images/$month"
 
   new_files=()
-  mkdir -p "$dest"
-
-  while IFS= read -r -d '' src_file; do
-    fname=$(basename "$src_file")
-    dst_file="$dest/$fname"
-    if [ -f "$dst_file" ]; then
+  while IFS= read -r -d '' img_file; do
+    if git ls-files --error-unmatch "$img_file" >/dev/null 2>&1; then
       continue
     fi
-    new_files+=("$src_file")
+    new_files+=("$img_file")
   done < <(find "$month_dir" -maxdepth 1 -type f -print0)
 
   if [ ${#new_files[@]} -eq 0 ]; then
     continue
   fi
 
-  for src_file in "${new_files[@]}"; do
-    fname=$(basename "$src_file")
-    dst_file="$dest/$fname"
-    file_bytes=$(stat -c%s "$src_file" 2>/dev/null || stat -f%z "$src_file" 2>/dev/null)
+  for img_file in "${new_files[@]}"; do
+    file_bytes=$(stat -c%s "$img_file" 2>/dev/null || stat -f%z "$img_file" 2>/dev/null)
 
     if [ "$batch_bytes" -gt 0 ] && [ $((batch_bytes + file_bytes)) -gt "$BATCH_MAX_BYTES" ]; then
       flush_batch
     fi
 
-    cp "$src_file" "$dst_file"
-    git add "$dst_file"
+    git add "$img_file"
     batch_bytes=$((batch_bytes + file_bytes))
     batch_files=$((batch_files + 1))
   done
@@ -117,4 +95,4 @@ done
 flush_batch
 
 echo ""
-echo "All done. Site fully pushed to $REPO_URL"
+echo "All done. Site fully pushed."
