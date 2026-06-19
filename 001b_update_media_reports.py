@@ -104,8 +104,9 @@ def fetch_title(url, timeout=10):
         return fetch_youtube_title(video_id, timeout)
 
     headers = {
-        'User-Agent': 'Mozilla/5.0 (compatible; FacebookArchiveBot/1.0)',
-        'Accept': 'text/html',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
     }
     try:
         req = Request(url, headers=headers)
@@ -113,12 +114,13 @@ def fetch_title(url, timeout=10):
             content_type = resp.headers.get('Content-Type', '')
             if 'text/html' not in content_type and 'application/xhtml' not in content_type:
                 return ''
-            charset = 'utf-8'
-            ct_match = re.search(r'charset=([^\s;]+)', content_type)
-            if ct_match:
-                charset = ct_match.group(1)
             raw = resp.read(64 * 1024)
-            html = raw.decode(charset, errors='replace')
+            for enc in ('utf-8', 'big5', 'latin-1'):
+                try:
+                    html = raw.decode(enc)
+                    break
+                except (UnicodeDecodeError, LookupError):
+                    continue
             parser = TitleParser()
             parser.feed(html)
             return parser.title
