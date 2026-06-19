@@ -11,7 +11,10 @@ cp ~/Downloads/facebook-kolctw-*.zip tmp/
 # 2. Update the site with new posts
 python3 001_update_site.py
 
-# 3. Push to GitHub
+# 3. Extract media report links from comments
+python3 001b_update_media_reports.py
+
+# 4. Push to GitHub
 bash 002_push_to_github.sh
 ```
 
@@ -20,30 +23,31 @@ bash 002_push_to_github.sh
 | Script | Purpose |
 |--------|---------|
 | `001_update_site.py` | Extract new backup zip from `tmp/`, merge new posts into the static site at `../facebook/` |
-| `002_push_to_github.sh` | Push the updated site to GitHub in size-safe batches (one monthly image folder per commit) |
+| `001b_update_media_reports.py` | Scan comments for '感謝報導', extract URLs, attach as 媒體報導 to matching posts |
+| `002_push_to_github.sh` | Push the updated site to GitHub in size-safe batches (batch limit: 500 MB) |
 | `003_rebuild_site_from_scratch.py` | (Legacy) Full site regeneration from an extracted backup directory |
 | `004_merge_two_backup_dirs.py` | (Legacy) Merge two extracted backup directories into one |
 
 ## Directory layout
 
 ```
-/home/kiang/public_html/
-  facebook_scripts/          <- this repo
-    tmp/                     <- place new backup ZIPs here
-      *.zip
-    001_update_site.py
-    002_push_to_github.sh
-    003_rebuild_site_from_scratch.py
-    004_merge_two_backup_dirs.py
-  facebook/                  <- the generated static site
-    index.html
-    data/
-      index.json
-      2026-04.json
-      ...
-    images/
-      2026-04/
-      ...
+facebook_scripts/              <- this repo
+  tmp/                         <- place new backup ZIPs here
+    *.zip
+  001_update_site.py
+  001b_update_media_reports.py
+  002_push_to_github.sh
+  003_rebuild_site_from_scratch.py
+  004_merge_two_backup_dirs.py
+facebook/                      <- the generated static site
+  index.html
+  data/
+    index.json
+    2026-04.json
+    ...
+  images/
+    2026-04/
+    ...
 ```
 
 ## Prerequisites
@@ -51,23 +55,19 @@ bash 002_push_to_github.sh
 - Python 3.8+
 - `git` with SSH access configured for GitHub
 
-## What `001_update_site.py` does
+## What `001b_update_media_reports.py` does
 
-1. Finds the most recent `.zip` in `tmp/` (or uses a path you specify)
-2. Extracts into `tmp/<zip-name>/`
-3. Loads posts from `profile_posts_*.json`
-4. Filters out group posts and video-only posts
-5. Deduplicates against existing site data by timestamp
-6. Merges new posts into `../facebook/data/YYYY-MM.json` files
-7. Updates `../facebook/data/index.json`
-8. Copies new images to `../facebook/images/YYYY-MM/`
-9. Cleans up the extracted directory
+1. Reads `comments.json` directly from the backup zip (no extraction needed)
+2. Finds all comments containing '感謝報導' with URLs
+3. Crawls each URL to fetch the page `<title>` as the display name
+4. Writes `data/media_reports.json` with URL, title, and comment date
+5. Idempotent: re-running only crawls URLs that previously failed
 
 ## What `002_push_to_github.sh` does
 
-1. Clones/pulls `git@github.com:kiang/facebook.git` to `/tmp/facebook-gh-push`
+1. Works directly in the `../facebook/` git repo
 2. Commits `index.html` + `data/` (skips if unchanged)
-3. Commits each monthly image folder separately and pushes
+3. Commits image files in batches under 500 MB and pushes
 4. Resumable: re-run if interrupted
 
 ## Site features
@@ -76,4 +76,5 @@ bash 002_push_to_github.sh
 - Hash-based routing (`#2025-11`, `#post/1764252237`, `#search/台南`)
 - Full-text search across all months
 - Photo lightbox with arrow key navigation
+- 媒體報導 (media reports) section on posts with press coverage links
 - Responsive layout
