@@ -76,7 +76,33 @@ class TitleParser(HTMLParser):
             self._parts.append(data)
 
 
+def normalize_youtube_url(url):
+    """Extract video ID and return a canonical youtube.com URL, or None."""
+    m = re.match(r'https?://(?:www\.)?youtube\.com/watch\?v=([A-Za-z0-9_-]+)', url)
+    if m:
+        return m.group(1)
+    m = re.match(r'https?://youtu\.be/([A-Za-z0-9_-]+)', url)
+    if m:
+        return m.group(1)
+    return None
+
+
+def fetch_youtube_title(video_id, timeout=10):
+    oembed_url = f'https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json'
+    try:
+        req = Request(oembed_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urlopen(req, timeout=timeout) as resp:
+            data = json.load(resp)
+        return data.get('title', '')
+    except Exception:
+        return ''
+
+
 def fetch_title(url, timeout=10):
+    video_id = normalize_youtube_url(url)
+    if video_id:
+        return fetch_youtube_title(video_id, timeout)
+
     headers = {
         'User-Agent': 'Mozilla/5.0 (compatible; FacebookArchiveBot/1.0)',
         'Accept': 'text/html',
